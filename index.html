@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Cerdas Dokumentasi CPPB</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f1f5f9;
+        }
+        .flowchart-box {
+            transition: all 0.3s ease; cursor: pointer; border: 2px solid transparent;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+        }
+        .flowchart-box:hover, .flowchart-box.active {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+            border-color: #3b82f6;
+        }
+        .form-container {
+            border: 1px solid #e2e8f0; border-radius: 0.75rem;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+            transition: all 0.3s ease-in-out;
+        }
+        .form-content table { width: 100%; border-collapse: collapse; }
+        .form-content th, .form-content td {
+            border: 1px solid #cbd5e1; padding: 0.75rem; text-align: left; font-size: 0.875rem;
+        }
+        .form-content th { background-color: #f8fafc; font-weight: 600; vertical-align: middle; text-align: center; }
+        .form-header-main { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #e2e8f0; }
+        .form-header-sub { display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 1rem; padding-bottom: 0.5rem; border-bottom: 1px solid #e2e8f0; }
+        .sub-header-row td { background-color: #e2e8f0; font-weight: bold; text-align: center; }
+        .hidden { display: none; }
+        .btn {
+            font-weight: 600; padding: 0.6rem 1.2rem; border-radius: 0.5rem; transition: all 0.3s;
+            box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1), 0 1px 2px -1px rgba(0,0,0,0.1);
+            color: white; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 0.5rem; justify-content: center;
+        }
+        .btn:hover:not(:disabled) {
+             box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+             transform: translateY(-2px);
+        }
+        .btn:disabled { background-color: #94a3b8; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-ai { background-color: #8b5cf6; }
+        .btn-ai:hover:not(:disabled) { background-color: #7c3aed; }
+        .btn-saran { background-color: #0ea5e9; }
+        .btn-saran:hover:not(:disabled) { background-color: #0284c7; }
+        .btn-pdf { background-color: #ef4444; }
+        .btn-pdf:hover:not(:disabled) { background-color: #dc2626; }
+        .btn-save-key { background-color: #16a34a; }
+        .btn-save-key:hover:not(:disabled) { background-color: #15803d; }
+        .btn-change-key { background-color: #f97316; font-size: 0.875rem; padding: 0.4rem 0.8rem; }
+
+        .loader {
+            width: 18px; height: 18px; border: 2px solid #FFF; border-bottom-color: transparent;
+            border-radius: 50%; display: inline-block; box-sizing: border-box; animation: rotation 1s linear infinite;
+        }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        details > summary { cursor: pointer; font-weight: 500; color: #475569; }
+    </style>
+</head>
+<body class="p-4 sm:p-6 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <header class="text-center mb-10 no-print">
+            <h1 class="text-3xl sm:text-4xl font-bold text-gray-800">Aplikasi Cerdas Dokumentasi CPPB</h1>
+            <p class="text-gray-600 mt-2">Dapatkan saran dari AI untuk bahan dan proses, lalu buat dokumen lengkap secara bertahap.</p>
+        </header>
+
+        <!-- API Key Section -->
+        <div id="api-key-section" class="mb-8 p-6 bg-white rounded-xl shadow-lg border-2 border-amber-400">
+             <h2 class="text-2xl font-bold text-gray-800 mb-2">Konfigurasi Wajib: API Key</h2>
+             <p class="text-gray-600 mb-4">Aplikasi ini membutuhkan Google Gemini API Key untuk berfungsi. Kunci ini gratis dan akan disimpan di browser Anda.</p>
+             
+             <div class="flex items-center gap-4 mb-4">
+                 <input type="password" id="api-key-input" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Masukkan Google Gemini API Key Anda di sini">
+                 <button id="save-api-key-btn" class="btn btn-save-key">Simpan Kunci</button>
+             </div>
+
+             <details>
+                 <summary class="text-sm">Belum punya API Key? Klik di sini untuk melihat caranya.</summary>
+                 <div class="mt-3 p-4 bg-slate-50 rounded-lg border">
+                     <ol class="list-decimal list-inside space-y-2 text-sm text-gray-700">
+                         <li>Buka tautan berikut di tab baru: <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" class="text-blue-600 font-semibold hover:underline">Dapatkan Google Gemini API Key</a>.</li>
+                         <li>Masuk dengan akun Google Anda.</li>
+                         <li>Klik tombol "<b>Create API key in new project</b>".</li>
+                         <li>Sebuah kunci akan muncul. Klik ikon salin (copy) di sebelahnya.</li>
+                         <li>Kembali ke halaman ini, tempel (paste) kunci tersebut ke dalam kotak di atas dan klik "<b>Simpan Kunci</b>".</li>
+                     </ol>
+                 </div>
+             </details>
+        </div>
+        
+        <!-- Main App Section (Initially Hidden) -->
+        <div id="main-app-section" class="hidden">
+            <div id="api-key-display" class="mb-6 p-3 bg-green-100 text-green-800 border border-green-300 rounded-lg flex justify-between items-center text-sm">
+                <span>API Key aktif dan tersimpan.</span>
+                <button id="change-api-key-btn" class="btn btn-change-key">Ganti Kunci</button>
+            </div>
+            <!-- Input Section -->
+            <div id="input-section" class="mb-12 p-6 bg-white rounded-xl shadow-lg border border-gray-200 no-print">
+                <h2 class="text-2xl font-bold text-gray-800 mb-4">1. Informasi Dasar</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div>
+                        <label for="jenis-pangan" class="block text-sm font-medium text-gray-700 mb-1">Jenis Pangan</label>
+                        <input type="text" id="jenis-pangan" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Contoh: Keripik Singkong" value="Rendang Daging Sapi Kemasan">
+                    </div>
+                    <div>
+                        <label for="nama-irtp" class="block text-sm font-medium text-gray-700 mb-1">Nama Usaha/IRTP</label>
+                        <input type="text" id="nama-irtp" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Contoh: Dapur Umami" value="Rendang Cita Rasa Padang">
+                    </div>
+                     <div>
+                        <label for="nomor-pirt" class="block text-sm font-medium text-gray-700 mb-1">Nomor P-IRT</label>
+                        <input type="text" id="nomor-pirt" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Contoh: 1234567890123-28" value="P-IRT 2013275010123-28">
+                    </div>
+                </div>
+                
+                <hr class="my-6">
+
+                <div class="flex justify-between items-center mb-4">
+                     <h2 class="text-2xl font-bold text-gray-800">2. Bahan & Proses</h2>
+                     <button id="saran-ai-btn" class="btn btn-saran">Dapatkan Saran AI</button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div class="md:col-span-1">
+                        <label for="bahan-utama" class="block text-sm font-medium text-gray-700 mb-1">Bahan Baku, Tambahan & Pengemas (dapat disunting)</label>
+                        <textarea id="bahan-utama" rows="8" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Klik 'Dapatkan Saran AI' atau isi manual..."></textarea>
+                    </div>
+                    <div class="md:col-span-1">
+                        <label for="proses-ringkas" class="block text-sm font-medium text-gray-700 mb-1">Deskripsi Proses Ringkas (dapat disunting)</label>
+                        <textarea id="proses-ringkas" rows="8" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Klik 'Dapatkan Saran AI' atau isi manual..."></textarea>
+                    </div>
+                </div>
+
+                <hr class="my-6">
+                
+                <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">3. Buat Dokumen</h2>
+
+                <div id="generation-steps" class="mt-6 text-center space-y-4">
+                    <button id="generate-dasar-btn" class="btn btn-ai text-lg">
+                        Langkah 1: Buat Dokumen Dasar (Form 9 & Alur Proses)
+                    </button>
+                    <button id="generate-contoh-btn" class="btn btn-ai text-lg hidden">
+                        Langkah 2: Buat Contoh Pengisian Form Harian
+                    </button>
+                </div>
+
+                <div id="ai-status" class="mt-4 text-center text-gray-600"></div>
+            </div>
+            
+            <h2 id="documentation-header" class="text-2xl font-bold text-gray-800 mb-4 hidden no-print">4. Hasil Dokumentasi</h2>
+            <div id="flowchart-container" class="flex flex-col items-center space-y-8 mb-12 no-print hidden"></div>
+            <div id="form-display-area" class="space-y-8"></div>
+        </div>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const { jsPDF } = window.jspdf;
+
+    // --- Global State ---
+    let geminiApiKey = null;
+    let generatedData = {};
+
+    // --- Element Selectors ---
+    const apiKeySection = document.getElementById('api-key-section');
+    const apiKeyInput = document.getElementById('api-key-input');
+    const saveApiKeyBtn = document.getElementById('save-api-key-btn');
+    const changeApiKeyBtn = document.getElementById('change-api-key-btn');
+    const apiKeyDisplay = document.getElementById('api-key-display');
+    const mainAppSection = document.getElementById('main-app-section');
+
+    const saranBtn = document.getElementById('saran-ai-btn');
+    const generateDasarBtn = document.getElementById('generate-dasar-btn');
+    const generateContohBtn = document.getElementById('generate-contoh-btn');
+    
+    const aiStatus = document.getElementById('ai-status');
+    const flowchartContainer = document.getElementById('flowchart-container');
+    const formDisplayArea = document.getElementById('form-display-area');
+    const documentationHeader = document.getElementById('documentation-header');
+    const inputJenisPangan = document.getElementById('jenis-pangan');
+    const inputNamaIrtp = document.getElementById('nama-irtp');
+    const inputNomorPirt = document.getElementById('nomor-pirt');
+    const inputBahan = document.getElementById('bahan-utama');
+    const inputProses = document.getElementById('proses-ringkas');
+
+    // --- Initialization ---
+    function initializeApp() {
+        const storedKey = localStorage.getItem('gemini_api_key');
+        if (storedKey) {
+            geminiApiKey = storedKey;
+            showMainApp();
+        } else {
+            showApiKeySection();
+        }
+    }
+
+    // --- UI State Changers ---
+    function showMainApp() {
+        apiKeySection.classList.add('hidden');
+        mainAppSection.classList.remove('hidden');
+    }
+
+    function showApiKeySection() {
+        mainAppSection.classList.add('hidden');
+        apiKeySection.classList.remove('hidden');
+    }
+
+    // --- Event Listeners ---
+    saveApiKeyBtn.addEventListener('click', () => {
+        const key = apiKeyInput.value.trim();
+        if (key) {
+            geminiApiKey = key;
+            localStorage.setItem('gemini_api_key', key);
+            showMainApp();
+            apiKeyInput.value = '';
+        } else {
+            alert('Harap masukkan API Key yang valid.');
+        }
+    });
+
+    changeApiKeyBtn.addEventListener('click', () => {
+        if (confirm('Apakah Anda yakin ingin mengganti API Key? Anda perlu memasukkan yang baru.')) {
+            geminiApiKey = null;
+            localStorage.removeItem('gemini_api_key');
+            showApiKeySection();
+            // Reset UI
+            formDisplayArea.innerHTML = '';
+            flowchartContainer.classList.add('hidden');
+            documentationHeader.classList.add('hidden');
+            generateDasarBtn.classList.remove('hidden');
+            generateContohBtn.classList.add('hidden');
+            aiStatus.textContent = '';
+            generatedData = {};
+        }
+    });
+
+    saranBtn.addEventListener('click', handleSaranClick);
+    generateDasarBtn.addEventListener('click', handleGenerateDasarClick);
+    generateContohBtn.addEventListener('click', handleGenerateContohClick);
+    
+    // --- Saran AI Handler ---
+    async function handleSaranClick() {
+        const jenisPangan = inputJenisPangan.value.trim();
+        if (!jenisPangan) {
+            alert("Harap isi 'Jenis Pangan' terlebih dahulu untuk mendapatkan saran.");
+            return;
+        }
+
+        setLoadingState(saranBtn, true, 'Dapatkan Saran AI');
+        try {
+            const suggestions = await callGeminiForSuggestions(jenisPangan);
+            if (suggestions) {
+                inputBahan.value = suggestions.bahan;
+                inputProses.value = suggestions.proses;
+                aiStatus.textContent = "Saran AI berhasil dimuat. Anda dapat menyuntingnya jika perlu.";
+                aiStatus.className = "mt-4 text-center text-sky-600 font-semibold";
+            }
+        } catch (error) {
+            console.error("Error getting AI suggestions:", error);
+            handleApiError(error);
+        } finally {
+            setLoadingState(saranBtn, false, 'Dapatkan Saran AI');
+        }
+    }
+
+    // --- Staged Process Handlers ---
+    async function handleGenerateDasarClick() {
+        const validationError = validateInputs();
+        if (validationError) {
+            aiStatus.textContent = validationError;
+            aiStatus.className = "mt-4 text-center text-red-600 font-semibold";
+            return;
+        }
+
+        setLoadingState(generateDasarBtn, true, 'Membuat Dokumen Dasar...');
+        aiStatus.textContent = "Mohon tunggu, AI sedang menyusun dokumen dasar (Form 9, Alur, CCP)...";
+        aiStatus.className = "mt-4 text-center text-indigo-600";
+        try {
+            const inputs = getallInputs();
+            const aiData = await callGeminiForDasarDocs(inputs);
+            if (aiData) {
+                generatedData = aiData; // Start fresh with dasar data
+                renderDasarUI(generatedData);
+                aiStatus.textContent = "Dokumen dasar berhasil dibuat. Lanjutkan ke langkah 2.";
+                aiStatus.className = "mt-4 text-center text-green-600 font-semibold";
+                generateDasarBtn.classList.add('hidden');
+                generateContohBtn.classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error("Error during AI processing (Dasar):", error);
+            handleApiError(error);
+        } finally {
+            setLoadingState(generateDasarBtn, false, 'Langkah 1: Buat Dokumen Dasar (Form 9 & Alur Proses)');
+        }
+    }
+
+    async function handleGenerateContohClick() {
+        setLoadingState(generateContohBtn, true, 'Membuat Contoh Form...');
+        aiStatus.textContent = "Mohon tunggu, AI sedang mengisi contoh form harian untuk Anda...";
+        aiStatus.className = "mt-4 text-center text-indigo-600";
+        try {
+            const inputs = getallInputs();
+            const aiData = await callGeminiForContohDocs(inputs, generatedData);
+            if (aiData) {
+                generatedData = { ...generatedData, ...aiData };
+                renderContohUI(aiData); // Render only the new forms
+                aiStatus.textContent = "Seluruh dokumen berhasil dibuat. Klik alur di atas untuk melihat detail.";
+                aiStatus.className = "mt-4 text-center text-green-600 font-semibold";
+                generateContohBtn.classList.add('hidden');
+            }
+        } catch (error) {
+            console.error("Error during AI processing (Contoh):", error);
+            handleApiError(error);
+        } finally {
+            setLoadingState(generateContohBtn, false, 'Langkah 2: Buat Contoh Pengisian Form Harian');
+        }
+    }
+
+
+    // --- API Calls ---
+    async function callGeminiForSuggestions(jenisPangan) {
+        const schema = {
+            type: "OBJECT",
+            properties: {
+                bahan: { type: "STRING", description: "Daftar lengkap bahan (baku, tambahan, pengemas) dipisahkan koma." },
+                proses: { type: "STRING", description: "Deskripsi proses produksi langkah demi langkah secara ringkas." }
+            }
+        };
+        const prompt = `Anda adalah konsultan pangan UMKM di Indonesia. Untuk jenis pangan "${jenisPangan}", berikan saran realistis untuk: 1. Daftar lengkap bahan-bahan (baku, tambahan, pengemas). 2. Deskripsi proses produksi langkah-demi-langkah.`;
+        
+        return await makeApiCall(prompt, schema);
+    }
+    
+    function getFormattedDate() {
+        const today = new Date();
+        const day = String(today.getDate()).padStart(2, '0');
+        const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        const month = monthNames[today.getMonth()];
+        const year = today.getFullYear();
+        return `${day} ${month} ${year}`;
+    }
+
+    async function callGeminiForDasarDocs(inputs) {
+        const { jenisPangan, namaIrtp, nomorPirt, bahan, proses } = inputs;
+        const schema = getDasarSchema();
+        const systemPrompt = getBaseSystemPrompt();
+        const userQuery = `Buatkan draf DOKUMEN DASAR CPPB (Form 9, diagram alir, analisis CCP) untuk produk berikut:
+- Nama Usaha: "${namaIrtp}"
+- Nomor PIRT: "${nomorPirt}"
+- Jenis Pangan: "${jenisPangan}"
+- Bahan-bahan: "${bahan}"
+- Proses Ringkas: "${proses}"`;
+        
+        return await makeApiCall(userQuery, schema, systemPrompt);
+    }
+    
+    async function callGeminiForContohDocs(inputs, dasarData) {
+        const { jenisPangan, namaIrtp, nomorPirt } = inputs;
+        const { kodeBatch, namaProduk } = dasarData;
+        const schema = getContohSchema();
+        const systemPrompt = getBaseSystemPrompt();
+
+        const userQuery = `Berdasarkan informasi produk yang sudah ada (Nama Usaha: "${namaIrtp}", Nama Produk: "${namaProduk}", Kode Batch: "${kodeBatch}"), buatkan CONTOH PENGISIAN FORM HARIAN & INSIDENTIL (Form 1, 2, 3, 4, 5, 6, 8, 10, 11, 12). Pastikan data yang diisi realistis dan konsisten satu sama lain.`;
+        
+        return await makeApiCall(userQuery, schema, systemPrompt);
+    }
+
+    async function makeApiCall(userQuery, schema, systemInstruction = null) {
+        if (!geminiApiKey) {
+            throw new Error("API Key belum diatur. Harap masukkan API Key Anda terlebih dahulu.");
+        }
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${geminiApiKey}`;
+        
+        const payload = {
+            contents: [{ parts: [{ text: userQuery }] }],
+            generationConfig: { responseMimeType: "application/json", responseSchema: schema },
+        };
+
+        if (systemInstruction) {
+            payload.systemInstruction = { parts: [{ text: systemInstruction }] };
+        }
+
+        let attempts = 0;
+        while (attempts < 3) {
+            try {
+                const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!response.ok) {
+                     const errorBody = await response.json();
+                     const errorMessage = errorBody.error?.message || `API request failed with status ${response.status}`;
+                     throw new Error(errorMessage);
+                }
+                const result = await response.json();
+                if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
+                     return JSON.parse(result.candidates[0].content.parts[0].text);
+                }
+                throw new Error("Respons API kosong atau formatnya salah.");
+            } catch (error) {
+                attempts++;
+                if (attempts >= 3) throw error;
+                await new Promise(res => setTimeout(res, 1000 * Math.pow(2, attempts)));
+            }
+        }
+    }
+    
+    // --- UI & State Management ---
+    function setLoadingState(button, isLoading, loadingText) {
+        button.disabled = isLoading;
+        const originalText = button.dataset.originalText || button.textContent;
+        if (!button.dataset.originalText) {
+            button.dataset.originalText = originalText;
+        }
+
+        if (isLoading) {
+            button.innerHTML = `<span class="loader"></span><span>${loadingText}</span>`;
+        } else {
+            button.innerHTML = `<span>${button.dataset.originalText}</span>`;
+        }
+    }
+    
+    function handleApiError(error) {
+        aiStatus.textContent = `Terjadi kesalahan: ${error.message}. Periksa API Key Anda atau coba lagi.`;
+        aiStatus.className = "mt-4 text-center text-red-600 font-semibold";
+    }
+
+    function renderDasarUI(data) {
+        documentationHeader.classList.remove('hidden');
+        renderFlowchart();
+        formDisplayArea.innerHTML = getFormsHTML(data, false); // Render ALL forms from dasar data
+
+        flowchartContainer.addEventListener('click', (e) => {
+            const flowchartBox = e.target.closest('.flowchart-box');
+            if (flowchartBox) {
+                handleFlowchartClick(flowchartBox);
+            }
+        });
+
+        formDisplayArea.addEventListener('click', function(e) {
+            const button = e.target.closest('.btn-pdf');
+            if (button) {
+                e.preventDefault();
+                downloadFormAsPDF(button);
+            }
+        });
+
+        // Activate the first flowchart box by default
+        flowchartContainer.querySelector('.flowchart-box[data-form-ids^="9a"]')?.click();
+    }
+    
+    function renderContohUI(data) {
+        // BUG FIX: Append the new forms HTML to the existing display area.
+        formDisplayArea.innerHTML += getFormsHTML(data, true); // Render only CONTOH forms
+        
+        // Re-activate the current selection or default
+        const activeBox = flowchartContainer.querySelector('.flowchart-box.active') || flowchartContainer.querySelector('.flowchart-box');
+        if (activeBox) {
+            handleFlowchartClick(activeBox);
+        }
+    }
+    
+    // --- Input Validation & Gathering ---
+    function validateInputs() {
+        if (!inputJenisPangan.value.trim()) return "Jenis Pangan harus diisi.";
+        if (!inputNamaIrtp.value.trim()) return "Nama Usaha/IRTP harus diisi.";
+        if (!inputNomorPirt.value.trim()) return "Nomor P-IRT harus diisi.";
+        if (!inputBahan.value.trim()) return "Bahan-bahan harus diisi.";
+        if (!inputProses.value.trim()) return "Deskripsi Proses harus diisi.";
+        return null;
+    }
+    
+    function getallInputs() {
+        return {
+            jenisPangan: inputJenisPangan.value.trim(),
+            namaIrtp: inputNamaIrtp.value.trim(),
+            nomorPirt: inputNomorPirt.value.trim(),
+            bahan: inputBahan.value.trim(),
+            proses: inputProses.value.trim()
+        };
+    }
+    
+    // --- Dynamic Content Rendering ---
+    function handleFlowchartClick(flowchartBox) {
+        flowchartContainer.querySelectorAll('.flowchart-box').forEach(b => b.classList.remove('active'));
+        flowchartBox.classList.add('active');
+        
+        document.querySelectorAll('.form-content').forEach(form => form.classList.add('hidden'));
+        const formIdsToShow = flowchartBox.dataset.formIds.split(',');
+        formIdsToShow.forEach(id => {
+            const formElement = document.getElementById(`form-${id.trim()}`);
+            if (formElement) {
+                formElement.classList.remove('hidden');
+            }
+        });
+        
+        const firstVisibleForm = document.querySelector('.form-content:not(.hidden)');
+        if (firstVisibleForm) {
+           firstVisibleForm.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    function renderFlowchart() {
+        flowchartContainer.classList.remove('hidden');
+        flowchartContainer.innerHTML = `
+            <div class="flowchart-box bg-gray-600 text-white p-4 rounded-lg w-64 text-center" data-form-ids="9a,9b,9c,production-flowchart">
+                <h2 class="font-bold">DASAR/REFERENSI</h2><p>(Form 9 & Analisis Bahaya)</p>
+            </div>
+            <div class="text-3xl font-bold text-gray-400">&darr;</div>
+            <div class="border-4 border-blue-500 rounded-xl p-6 w-full max-w-5xl shadow-xl bg-white">
+                <h3 class="text-2xl font-bold text-center mb-6 text-blue-600">ALUR RUTIN</h3>
+                <div class="flex flex-col md:flex-row justify-center items-center gap-8 md:gap-4">
+                    <div class="flowchart-box bg-blue-500 text-white p-4 rounded-lg w-56 text-center" data-form-ids="1,2"><h2 class="font-bold">[INPUT]</h2><p>(Form 1, 2)</p></div>
+                    <div class="text-3xl font-bold text-gray-400">&rarr;</div>
+                    <div class="flowchart-box bg-blue-500 text-white p-4 rounded-lg w-56 text-center" data-form-ids="10,3,4"><h2 class="font-bold">[PROSES & MONEV]</h2><p>(Form 10, 3, 4)</p></div>
+                    <div class="text-3xl font-bold text-gray-400">&rarr;</div>
+                    <div class="flowchart-box bg-blue-500 text-white p-4 rounded-lg w-56 text-center" data-form-ids="5"><h2 class="font-bold">[DISTRIBUSI]</h2><p>(Form 5)</p></div>
+                </div>
+            </div>
+            <div class="relative w-full max-w-5xl text-center">
+                 <div class="inline-block text-red-600 font-semibold bg-red-100 border border-red-500 p-2 rounded-lg">
+                    <span class="text-5xl leading-none">&darr;</span> (Jika ditemukan masalah)
+                </div>
+            </div>
+            <div class="border-4 border-red-500 rounded-xl p-6 w-full max-w-5xl shadow-xl bg-white">
+                <h3 class="text-2xl font-bold text-center mb-6 text-red-600">ALUR INSIDENTIL</h3>
+                <div class="flex flex-col md:flex-row justify-center items-center gap-8">
+                    <div class="flowchart-box bg-red-500 text-white p-4 rounded-lg w-64 text-center" data-form-ids="6,8"><h2 class="font-bold">[PENANGANAN MASALAH]</h2><p>(Form 6, 8)</p></div>
+                    <div class="font-bold text-gray-700 text-xl">atau</div>
+                    <div class="flowchart-box bg-red-500 text-white p-4 rounded-lg w-64 text-center" data-form-ids="11a,11b,11c,11d,12a,12b,12c1,12c2,12c3"><h2 class="font-bold">[RECALL & TELUSUR]</h2><p>(Form 11, 12)</p></div>
+                </div>
+            </div>`;
+    }
+    
+    async function downloadFormAsPDF(button) {
+        const formContainer = button.closest('.form-content');
+        if (!formContainer) return;
+        setLoadingState(button, true, 'Membuat PDF...');
+        try {
+            const canvas = await html2canvas(formContainer, { scale: 2 });
+            const imgData = canvas.toDataURL('image/png');
+            const pdf = new jsPDF({
+                orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+                unit: 'px',
+                format: [canvas.width, canvas.height]
+            });
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            const fileName = (formContainer.querySelector('h3')?.textContent || 'Dokumen_CPPB').trim().replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            pdf.save(`${fileName}.pdf`);
+        } catch (error) {
+            console.error("Error generating PDF:", error);
+            alert("Gagal membuat PDF.");
+        } finally {
+            setLoadingState(button, false, '');
+        }
+    }
+    
+    function getBaseSystemPrompt() {
+        const todayDate = getFormattedDate();
+        return `Anda adalah asisten ahli dokumentasi keamanan pangan untuk UMKM di Indonesia. Tugas Anda adalah menghasilkan data JSON LENGKAP sesuai skema untuk dokumentasi CPPB yang realistis & sesuai standar.
+PENTING: Terapkan definisi ini dengan ketat saat menentukan CCP dan CP:
+- CCP (Titik Kendali Kritis): HANYA untuk satu atau beberapa titik proses yang paling berisiko untuk menghilangkan/mengurangi bahaya cemaran biologis, kimia, atau fisik ke tingkat aman. Contoh: Pemasakan, pasteurisasi, deteksi logam. Ini adalah titik 'wajib benar' untuk keamanan.
+- CP (Titik Kendali): HANYA untuk titik proses yang mempengaruhi kualitas produk (rasa, tekstur, penampilan, berat), tetapi TIDAK secara langsung menghilangkan bahaya keamanan pangan. Contoh: Pencampuran, penimbangan, pengadukan.
+
+Gunakan tanggal hari ini, ${todayDate}, sebagai tanggal utama. Buat data untuk SEMUA formulir yang diminta, termasuk skenario insidentil yang masuk akal. Pastikan data konsisten. Buat nama supplier, alamat, paraf (inisial 3 huruf), dan kode produksi/batch yang kredibel. JANGAN meninggalkan field kosong.
+
+Untuk skenario insidentil, bedakan dengan jelas:
+- **Kegagalan Internal (Formulir 6 & 8):** Buat skenario di mana produk gagal dalam pemeriksaan kualitas akhir (misalnya, warna atau tekstur tidak sesuai) *sebelum* didistribusikan. Tindakannya adalah rework atau pemusnahan.
+- **Penarikan Produk / Recall (Formulir 11 & 12):** Buat skenario berdasarkan keluhan pelanggan *setelah* produk didistribusikan. Ini memicu penarikan dari pasar.`;
+    }
+
+    function getFormsHTML(data, isContohOnly = false) {
+        const { namaIrtp = generatedData.namaIrtp, namaProduk = generatedData.namaProduk, kodeBatch = generatedData.kodeBatch, form1, form2, form3, form4, form5, form6, form8, form9a, form9b, form9c, form10, form11_12, diagramAlir, analisisCCP } = data;
+        const docInfo = (docNum) => `<div>NAMA IRTP: <span class="font-mono">${namaIrtp}</span></div><div>No. Dokumen: <span class="font-mono">${docNum}</span><br>Berlaku Sejak: <span class="font-mono">01/01/2025</span></div>`;
+        let html = '';
+
+        // DASAR FORMS (only if isContohOnly is false)
+        if (!isContohOnly) {
+            if(form9a) html += `<div id="form-9a" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>9a. Komposisi Bahan</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><ul class="list-disc list-inside space-y-2 bg-gray-50 p-4 rounded-md"><li><b>BAHAN BAKU UTAMA:</b> ${form9a.bahanBakuUtama}</li><li><b>BAHAN TAMBAHAN PANGAN:</b> ${form9a.bahanTambahan}</li><li><b>BAHAN PENGEMAS:</b> ${form9a.bahanPengemas}</li></ul></div>`;
+            if(form9b) html += `<div id="form-9b" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>9b. Deskripsi Bahan</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><div class="overflow-x-auto"><table><thead><tr><th>Kategori</th><th>Uraian</th></tr></thead><tbody>${form9b.map(i=>`<tr class="sub-header-row"><td colspan="2">${i.nama}</td></tr><tr><td>Komposisi</td><td>${i.komposisi}</td></tr><tr><td>Pengemasan Pemasok</td><td>${i.pengemasanPemasok}</td></tr><tr><td>Masa Kadaluarsa</td><td>${i.masaKadaluarsa}</td></tr><tr><td>Penyimpanan</td><td>${i.penyimpanan}</td></tr><tr><td>Regulasi</td><td>${i.regulasi}</td></tr>`).join('')}</tbody></table></div></div>`;
+            if(form9c) html += `<div id="form-9c" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>9c. Deskripsi Produk Jadi</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><div class="overflow-x-auto"><table><tbody><tr><td class="font-semibold w-1/3">Nama produk</td><td>${form9c.namaProduk}</td></tr><tr><td class="font-semibold w-1/3">Kategori Proses</td><td>${form9c.kategoriProses}</td></tr><tr><td class="font-semibold w-1/3">Komposisi</td><td>${form9c.komposisi}</td></tr><tr><td class="font-semibold w-1/3">Pengemasan</td><td>${form9c.pengemasan}</td></tr><tr><td class="font-semibold w-1/3">Masa Kadaluarsa</td><td>${form9c.masaKadaluarsa}</td></tr><tr><td class="font-semibold w-1/3">Cara Penyimpanan</td><td>${form9c.caraPenyimpanan}</td></tr><tr><td class="font-semibold w-1/3" rowspan="4" style="vertical-align: middle;">Deskripsi Organoleptik</td><td><b>Warna:</b> ${form9c.warna}</td></tr><tr><td><b>Aroma:</b> ${form9c.aroma}</td></tr><tr><td><b>Rasa:</b> ${form9c.rasa}</td></tr><tr><td><b>Tekstur:</b> ${form9c.tekstur}</td></tr></tbody></table></div></div>`;
+            if(diagramAlir && analisisCCP) {
+                const diagramHTML = `<div class="space-y-4 text-sm text-gray-800">${diagramAlir.map((p,index)=>`<div class="flex items-center gap-4"><div class="flex-shrink-0 w-32 h-16 ${p.kategori==='CCP'?'bg-red-100 border-red-500':'bg-blue-100 border-blue-500'} border-2 rounded-lg flex items-center justify-center font-bold text-center p-2"><span class="font-bold ${p.kategori==='CCP'?'text-red-800':'text-blue-800'}">${p.kategori}</span><br>${p.tahap}</div><div class="text-2xl font-bold text-gray-500">&rarr;</div><div class="flex-grow p-2 border ${p.kategori==='CCP'?'border-red-300 bg-red-50':'border-blue-300 bg-blue-50'} rounded-md"><p class="text-xs">${p.detail}</p></div></div>${index<diagramAlir.length-1?'<div class="pl-16 text-2xl font-bold text-gray-500">&darr;</div>':''}`).join('')}</div>`;
+                const ccpTableHTML = `<div class="overflow-x-auto"><table><thead><tr><th>Tahap Proses</th><th>Potensi Bahaya</th><th>Kategori</th><th>Tindakan Pengendalian</th></tr></thead><tbody>${analisisCCP.map(a=>`<tr><td><strong>${a.tahap}</strong></td><td>${a.bahaya}</td><td class="text-center font-bold ${a.kategori==='CCP'?'text-red-600':'text-blue-600'}">${a.kategori}</td><td>${a.pengendalian}</td></tr>`).join('')}</tbody></table></div>`;
+                html += `<div id="form-production-flowchart" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>Diagram Alir & Analisis CCP/CP</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><div class="mb-8 p-4 border rounded-lg bg-white"><h4 class="text-lg font-semibold mb-4">Diagram Alir Produksi</h4>${diagramHTML}</div><div class="p-4 border rounded-lg bg-white"><h4 class="text-lg font-semibold mb-4">Analisis CCP & CP</h4>${ccpTableHTML}</div></div>`;
+            }
+        }
+
+        // CONTOH FORMS (always render if data exists)
+        if(form1) html += `<div id="form-1" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>Formulir Penerimaan Bahan</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><div class="form-header-sub">${docInfo('FR-PROD-01')}</div><div class="overflow-x-auto"><table><thead><tr><th rowspan="2">Tanggal</th><th rowspan="2">Nama Barang</th><th rowspan="2">Supplier</th><th colspan="2">Kuantitas</th><th rowspan="2">Kode Produksi Bahan</th><th rowspan="2">Terima/Tolak</th><th rowspan="2">Alasan</th><th rowspan="2">Paraf</th></tr><tr><th>Satuan</th><th>Total</th></tr></thead><tbody>${form1.map(i=>`<tr><td>${i.tanggal}</td><td>${i.namaBarang}</td><td>${i.supplier}</td><td>${i.satuan}</td><td>${i.totalKuantitas}</td><td>${i.kodeProduksiBahan}</td><td>${i.terimaTolak}</td><td>${i.alasan}</td><td>${i.paraf}</td></tr>`).join('')}</tbody></table></div></div>`;
+        if(form2) html += `<div id="form-2" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>Formulir Penggunaan Bahan (Kartu Stok)</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><div class="form-header-sub">${docInfo('FR-PROD-02')}</div><div class="overflow-x-auto"><table><thead><tr><th>Tanggal</th><th>Nama Bahan</th><th>Masuk</th><th>Keluar</th><th>Sisa</th><th>Paraf</th></tr></thead><tbody>${form2.map(i=>`<tr><td>${i.tanggal}</td><td>${i.namaBahan}</td><td>${i.jmlMasuk}</td><td>${i.jmlKeluar}</td><td>${i.sisa}</td><td>${i.paraf}</td></tr>`).join('')}</tbody></table></div></div>`;
+        if(form3) html += `<div id="form-3" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>Formulir Pemantauan Proses</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><div class="form-header-sub">${docInfo('FR-PROD-03')}</div><p class="text-sm font-semibold mb-2">Nama Produk: ${namaProduk}</p><div class="overflow-x-auto"><table><thead><tr><th rowspan="2">Tanggal</th><th rowspan="2">Kode Produksi</th><th colspan="3">Proses</th><th rowspan="2">Parameter Kritis (CCP/CP)</th><th rowspan="2">Jml Jadi</th><th rowspan="2">Paraf</th></tr><tr><th>Tahap</th><th>Mulai</th><th>Selesai</th></tr></thead><tbody>${form3.map(i=>`<tr><td>${i.tanggal}</td><td>${kodeBatch}</td><td>${i.tahap}</td><td>${i.waktuMulai}</td><td>${i.waktuSelesai}</td><td>${i.parameterKritis}</td><td>${i.jumlahJadi}</td><td>${i.paraf}</td></tr>`).join('')}</tbody></table></div></div>`;
+        if(form4) html += `<div id="form-4" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>Formulir Pemantauan Produk Akhir</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><div class="form-header-sub">${docInfo('FR-QC-01')}</div><div class="overflow-x-auto"><table><thead><tr><th rowspan="2">Tanggal</th><th rowspan="2">Nama Produk</th><th rowspan="2">Kode Produksi</th><th colspan="4">Parameter Rilis (Organoleptik)</th><th rowspan="2">OK/Tdk OK</th></tr><tr><th>Rasa</th><th>Aroma</th><th>Warna</th><th>Tekstur</th></tr></thead><tbody><tr><td>${form4.tanggal}</td><td>${namaProduk}</td><td>${kodeBatch}</td><td>${form4.rasa}</td><td>${form4.aroma}</td><td>${form4.warna}</td><td>${form4.tekstur}</td><td>${form4.status}</td></tr></tbody></table></div></div>`;
+        if(form5) html += `<div id="form-5" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>Formulir Distribusi Produk Akhir</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><div class="form-header-sub">${docInfo('FR-WH-01')}</div><div class="overflow-x-auto"><table><thead><tr><th>Tanggal</th><th>Nama Produk</th><th>Kode Produksi</th><th>Jml</th><th>Pelanggan</th><th>Alamat & Telp</th><th>Paraf</th></tr></thead><tbody>${form5.map(i=>`<tr><td>${i.tanggal}</td><td>${namaProduk}</td><td>${kodeBatch}</td><td>${i.jumlahDistribusi}</td><td>${i.pelanggan}</td><td>${i.alamatTelp}</td><td>${i.paraf}</td></tr>`).join('')}</tbody></table></div></div>`;
+        if(form6) html += `<div id="form-6" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>Formulir Penanganan Ketidaksesuaian</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><div class="form-header-sub">${docInfo('FR-QA-01')}</div><div class="overflow-x-auto"><table><thead><tr><th>Tanggal</th><th>Nama Produk</th><th>Kode Produksi</th><th>Uraian</th><th>Tindakan</th><th>Hasil Akhir</th></tr></thead><tbody><tr><td>${form6.tanggal}</td><td>${namaProduk}</td><td>${kodeBatch}</td><td>${form6.uraian}</td><td>${form6.tindakan}</td><td>${form6.hasilAkhir}</td></tr></tbody></table></div></div>`;
+        if(form8) html += `<div id="form-8" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>Formulir Pengolahan Ulang (Rework)</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><div class="form-header-sub">${docInfo('FR-PROD-04')}</div><div class="overflow-x-auto"><table><thead><tr><th>Tanggal</th><th>Nama Produk</th><th>Kode Produksi</th><th>Jml Awal</th><th>Proses Rework</th><th>Jml Jadi</th><th>OK/Tdk OK</th><th>Paraf</th></tr></thead><tbody><tr><td>${form8.tanggal}</td><td>${namaProduk}</td><td>${kodeBatch}</td><td>${form8.jumlahAwal}</td><td>${form8.prosesReworkDetail}</td><td>${form8.jumlahJadi}</td><td>${form8.status}</td><td>${form8.paraf}</td></tr></tbody></table></div></div>`;
+        if(form10) html += `<div id="form-10" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>Formulir Pembersihan dan Sanitasi</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><div class="overflow-x-auto"><table><thead><tr><th>Parameter</th><th>Hasil Pemantauan</th><th>Paraf</th></tr></thead><tbody>${form10.map(i=>`<tr><td>${i.parameter}</td><td>${i.hasil}</td><td>${i.paraf}</td></tr>`).join('')}</tbody></table></div></div>`;
+        if(form11_12) {
+            html += `<div id="form-11a" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>11a. Informasi Penyebab Penarikan</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><table><tbody><tr><td class="font-semibold w-1/3">Penyebab</td><td>${form11_12.penyebabRecall}</td></tr><tr><td class="font-semibold w-1/3">Sumber Info</td><td>${form11_12.sumberInfo}</td></tr></tbody></table></div>`;
+            html += `<div id="form-11b" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>11b. Informasi Pangan</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><table><tbody><tr><td class="font-semibold">Kode Produksi</td><td>${kodeBatch}</td></tr><tr><td class="font-semibold">Jumlah Produksi</td><td>${form11_12.jumlahProduksi}</td></tr><tr><td class="font-semibold">Jumlah Terkirim</td><td>${form11_12.jumlahTerkirim}</td></tr></tbody></table></div>`;
+            html += `<div id="form-11c" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>11c. Distribusi Penjualan</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><table><thead><th>Tgl Kirim</th><th>Jumlah</th><th>Distibutor</th><th>No Invoice</th></thead><tbody>${form11_12.distribusiRecall.map(d=>`<tr><td>${d.tanggal}</td><td>${d.jumlah}</td><td>${d.tujuan}</td><td>${d.noSuratJalan}</td></tr>`).join('')}</tbody></table></div>`;
+            html += `<div id="form-11d" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>11d. Rangkuman Penarikan</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><table><thead><th>Aktivitas</th><th>Mulai</th><th>Selesai</th><th>Total</th></thead><tbody>${form11_12.rangkumanWaktu.map(r=>`<tr><td>${r.aktivitas}</td><td>${r.mulai}</td><td>${r.selesai}</td><td>${r.total}</td></tr>`).join('')}</tbody></table></div>`;
+            html += `<div id="form-12a" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>12a. Informasi Awal Telusur</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><table><tbody><tr><td class="font-semibold w-1/3">Tgl Laporan</td><td>${form11_12.tanggalLaporan}</td></tr><tr><td class="font-semibold w-1/3">Sumber Info</td><td>${form11_12.sumberInfo}</td></tr><tr><td class="font-semibold w-1/3">Produk & Kode</td><td>${namaProduk} / ${kodeBatch}</td></tr></tbody></table></div>`;
+            html += `<div id="form-12b" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>12b. Telusur Eksternal</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><table><thead><th>Tgl Kirim</th><th>Jumlah</th><th>Tujuan</th></thead><tbody>${form11_12.distribusiRecall.map(d=>`<tr><td>${d.tanggal}</td><td>${d.jumlah}</td><td>${d.tujuan}</td></tr>`).join('')}</tbody></table></div>`;
+            html += `<div id="form-12c1" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>12c-1. Telusur Internal (Bahan Baku)</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><table><thead><th>Nama Bahan</th><th>Pemasok</th><th>Kode Pemasok</th><th>Tgl Terima</th></thead><tbody><tr><td>${form11_12.telusurBahan.namaBahan}</td><td>${form11_12.telusurBahan.pemasok}</td><td>${form11_12.telusurBahan.kodeBatchPemasok}</td><td>${form11_12.telusurBahan.tglTerima}</td></tr></tbody></table></div>`;
+            html += `<div id="form-12c2" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>12c-2. Laporan Pemantauan CCP</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><table><thead><th>Waktu</th><th>Titik Kendali</th><th>Hasil</th><th>Koreksi</th></thead><tbody><tr><td>${form11_12.telusurCCP.waktu}</td><td>${form11_12.telusurCCP.titikKendali}</td><td>${form11_12.telusurCCP.hasil}</td><td>${form11_12.telusurCCP.koreksi}</td></tr></tbody></table></div>`;
+            html += `<div id="form-12c3" class="form-content hidden form-container bg-white p-6"><div class="form-header-main"><h3>12c-3. Rekaman Sanitasi</h3><button class="btn btn-pdf" data-original-text="Unduh PDF">Unduh PDF</button></div><table><thead><th>Parameter</th><th>Hasil</th><th>Laporan</th></thead><tbody><tr><td>${form11_12.telusurSanitasi.parameter}</td><td>${form11_12.telusurSanitasi.hasil}</td><td>${form11_12.telusurSanitasi.laporan}</td></tr></tbody></table></div>`;
+        }
+        return html;
+    }
+
+    function getDasarSchema() {
+        return {
+            type: "OBJECT",
+            properties: {
+                namaIrtp: { type: "STRING" }, namaProduk: { type: "STRING" }, nomorPirt: { type: "STRING" }, kodeBatch: { type: "STRING" },
+                form9a: { type: "OBJECT", properties: { bahanBakuUtama: { type: "STRING" }, bahanTambahan: { type: "STRING" }, bahanPengemas: { type: "STRING" } }},
+                form9b: { type: "ARRAY", items: { type: "OBJECT", properties: { nama: { type: "STRING" }, komposisi: { type: "STRING" }, pengemasanPemasok: { type: "STRING" }, masaKadaluarsa: { type: "STRING" }, penyimpanan: { type: "STRING" }, regulasi: { type: "STRING" } }}},
+                form9c: { type: "OBJECT", properties: { 
+                    namaProduk: { type: "STRING" }, 
+                    kategoriProses: { type: "STRING" }, 
+                    komposisi: { type: "STRING" }, 
+                    pengemasan: { type: "STRING" }, 
+                    masaKadaluarsa: { type: "STRING" }, 
+                    caraPenyimpanan: { type: "STRING" },
+                    warna: { type: "STRING", description: "Deskripsi warna produk jadi, contoh: Coklat keemasan" },
+                    aroma: { type: "STRING", description: "Deskripsi aroma khas produk jadi, contoh: Harum rempah" },
+                    rasa: { type: "STRING", description: "Deskripsi rasa khas produk jadi, contoh: Gurih, sedikit pedas" },
+                    tekstur: { type: "STRING", description: "Deskripsi tekstur produk jadi, contoh: Empuk dan berserat" }
+                }},
+                diagramAlir: { type: "ARRAY", items: { type: "OBJECT", properties: { tahap: { type: "STRING" }, detail: { type: "STRING" }, kategori: { type: "STRING", enum: ["CP", "CCP"] } }}},
+                analisisCCP: { type: "ARRAY", items: { type: "OBJECT", properties: { tahap: { type: "STRING" }, bahaya: { type: "STRING" }, kategori: { type: "STRING", enum: ["CP", "CCP"] }, pengendalian: { type: "STRING" } }}},
+            }
+        };
+    }
+
+    function getContohSchema() {
+        return {
+            type: "OBJECT",
+            properties: {
+                form1: { type: "ARRAY", items: { type: "OBJECT", properties: { tanggal: { type: "STRING" }, namaBarang: { type: "STRING" }, supplier: { type: "STRING" }, satuan: { type: "STRING" }, totalKuantitas: { type: "STRING" }, kodeProduksiBahan: { type: "STRING" }, terimaTolak: { type: "STRING" }, alasan: { type: "STRING" }, paraf: { type: "STRING" } }}},
+                form2: { type: "ARRAY", items: { type: "OBJECT", properties: { tanggal: { type: "STRING" }, namaBahan: { type: "STRING" }, jmlMasuk: { type: "STRING" }, jmlKeluar: { type: "STRING" }, sisa: { type: "STRING" }, paraf: { type: "STRING" } }}},
+                form3: { type: "ARRAY", items: { type: "OBJECT", properties: { tanggal: { type: "STRING" }, tahap: { type: "STRING" }, waktuMulai: { type: "STRING" }, waktuSelesai: { type: "STRING" }, parameterKritis: { type: "STRING" }, jumlahJadi: { type: "STRING" }, paraf: { type: "STRING" } }}},
+                form4: { type: "OBJECT", properties: { tanggal: { type: "STRING" }, rasa: { type: "STRING" }, aroma: { type: "STRING" }, warna: { type: "STRING" }, tekstur: { type: "STRING" }, status: { type: "STRING" } }},
+                form5: { type: "ARRAY", items: { type: "OBJECT", properties: { tanggal: { type: "STRING" }, jumlahDistribusi: { type: "STRING" }, pelanggan: { type: "STRING" }, alamatTelp: { type: "STRING" }, paraf: { type: "STRING" } }}},
+                form6: { type: "OBJECT", properties: { tanggal: { type: "STRING" }, uraian: { type: "STRING" }, tindakan: { type: "STRING" }, hasilAkhir: { type: "STRING" } }},
+                form8: { type: "OBJECT", properties: { tanggal: { type: "STRING" }, jumlahAwal: { type: "STRING" }, prosesReworkDetail: { type: "STRING" }, jumlahJadi: { type: "STRING" }, status: { type: "STRING" }, paraf: { type: "STRING" } }},
+                form10: { type: "ARRAY", items: { type: "OBJECT", properties: { parameter: { type: "STRING" }, hasil: { type: "STRING" }, paraf: { type: "STRING" } }}},
+                form11_12: { type: "OBJECT", properties: { tanggalLaporan: { type: "STRING" }, penyebabRecall: { type: "STRING" }, sumberInfo: { type: "STRING" }, jumlahProduksi: { type: "STRING" }, jumlahTerkirim: { type: "STRING" }, distribusiRecall: { type: "ARRAY", items: { type: "OBJECT", properties: { tanggal: { type: "STRING" }, jumlah: { type: "STRING" }, tujuan: { type: "STRING" }, noSuratJalan: { type: "STRING" } }}}, rangkumanWaktu: { type: "ARRAY", items: { type: "OBJECT", properties: { aktivitas: { type: "STRING" }, mulai: { type: "STRING" }, selesai: { type: "STRING" }, total: { type: "STRING" } }}}, telusurBahan: { type: "OBJECT", properties: { namaBahan: { type: "STRING" }, pemasok: { type: "STRING" }, kodeBatchPemasok: { type: "STRING" }, tglTerima: { type: "STRING" } }}, telusurCCP: { type: "OBJECT", properties: { waktu: { type: "STRING" }, titikKendali: { type: "STRING" }, hasil: { type: "STRING" }, koreksi: { type: "STRING" } }}, telusurSanitasi: { type: "OBJECT", properties: { parameter: { type: "STRING" }, hasil: { type: "STRING" }, laporan: { type: "STRING" } }} }},
+            }
+        };
+    }
+    
+    // Start the application
+    initializeApp();
+});
+</script>
+</body>
+</html>
+
